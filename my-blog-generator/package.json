@@ -1,0 +1,20 @@
+{
+  "name": "my-blog-generator",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "ts-node src/build.ts",
+    "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\""
+  },
+  "dependencies": {
+    "@vue/server-renderer": "^3.4.0",
+    "gray-matter": "^4.0.3",
+    "markdown-it": "^13.0.1",
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.4"
+  }
+}
