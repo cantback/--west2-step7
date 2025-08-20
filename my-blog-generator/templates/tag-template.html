@@ -1,0 +1,16 @@
+<div style="max-width: 840px; margin: 40px auto; font-family: system-ui">
+  <h1>标签：{{ tag }}</h1>
+  <div
+    v-for="post in posts"
+    :key="post.slug"
+    style="padding: 16px 0; border-bottom: 1px solid #ddd"
+  >
+    <h2>
+      <a :href="'/posts/' + post.slug + '/index.html'">{{ post.title }}</a>
+    </h2>
+    <div style="font-size: 12px; color: #555">
+      发布：{{ formatDate(post.date) }}（{{ daysAgoFn(post.date) }}）
+    </div>
+    <p>{{ post.summary }}</p>
+  </div>
+</div>

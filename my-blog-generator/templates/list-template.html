@@ -1,0 +1,43 @@
+<div style="max-width: 840px; margin: 40px auto; font-family: system-ui">
+  <h1>文章列表</h1>
+  <div
+    v-for="post in posts"
+    :key="post.slug"
+    style="padding: 16px 0; border-bottom: 1px solid #ddd"
+  >
+    <h2>
+      <a
+        :href="'/posts/' + post.slug + '/index.html'"
+        style="text-decoration: none; color: #222"
+        >{{ post.title }}</a
+      >
+    </h2>
+    <div style="font-size: 12px; color: #555">
+      发布：{{ formatDate(post.date) }}（{{ daysAgoFn(post.date) }}）
+    </div>
+    <p>{{ post.summary }}</p>
+    <div>
+      <span v-if="post.tags && post.tags.length"
+        >标签：
+        <span v-for="t in post.tags" :key="t"
+          ><a :href="'/tags/' + encodeURIComponent(t) + '/index.html'"
+            >{{ t }}</a
+          >&nbsp;</span
+        >
+      </span>
+    </div>
+  </div>
+  <div style="margin-top: 24px; display: flex; gap: 8px">
+    <a
+      v-if="page > 1"
+      :href="page===2 ? '/index.html' : '/page/' + (page-1) + '/index.html'"
+      >上一页</a
+    >
+    <span>第 {{ page }} / {{ totalPages }} 页</span>
+    <a v-if="page < totalPages" :href="'/page/' + (page+1) + '/index.html'"
+      >下一页</a
+    >
+    <a href="/">首页</a>
+    <a :href="'/page/' + totalPages + '/index.html'">末页</a>
+  </div>
+</div>

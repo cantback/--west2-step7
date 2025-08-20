@@ -1,0 +1,14 @@
+<div style="max-width: 840px; margin: 40px auto; font-family: system-ui">
+  <h1>{{ title }}</h1>
+  <div style="font-size: 12px; color: #666; margin-bottom: 8px">
+    发布：{{ formatDate(date) }}（{{ daysAgoFn(date) }}） | 更新：{{
+    formatDate(updated) }}({{ daysAgoFn(updated) }})
+  </div>
+  <div style="margin-bottom: 12px">
+    标签：<span v-for="t in tags" :key="t"
+      ><a :href="'/tags/' + encodeURIComponent(t) + '/index.html'">{{ t }}</a
+      >&nbsp;</span
+    >
+  </div>
+  <div v-html="content"></div>
+</div>

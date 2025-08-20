@@ -2,195 +2,192 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import MarkdownIt from 'markdown-it';
-import { createSSRApp } from 'vue';
-import { renderToString } from '@vue/server-renderer';
+import mathjax3 from "markdown-it-mathjax3";   //数学公式插件
 
-const POSTS_PER_PAGE = 15;
-const CONTENT_DIR = path.join(process.cwd(), 'content/posts');
+// 配置
+const POSTS_PER_PAGE = 6;
+const CONTENT_DIR = path.join(process.cwd(), 'content/posts');  //文章目录
 const DIST = path.join(process.cwd(), 'dist');
 const TEMPLATE_DIR = path.join(process.cwd(), 'templates');
 const STATIC_DIR = path.join(process.cwd(), 'static');
 
-function readTemplate(name: string) {
-  return fs.readFileSync(path.join(TEMPLATE_DIR, name), 'utf-8');
-}
+// 工具
+//确保目录存在
 function ensureDir(p: string) {
   fs.mkdirSync(p, { recursive: true });
-}
+}   
+//格式化日期
+function formatDate(d: string | Date) {
+  const dt = new Date(d);
+  return dt.toISOString().split('T')[0];
+}  
+//计算几天前
 function daysAgo(date: string | Date) {
-  const now = new Date();
-  const d = new Date(date);
-  const diffMs = now.getTime() - d.getTime();
-  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const now = Date.now();
+  const d = new Date(date).getTime();
+  const diff = Math.max(0, now - d);
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   if (days === 0) return '今天';
   if (days === 1) return '1 天前';
   return `${days} 天前`;
 }
-function formatDate(d: string | Date) {
-  const dt = new Date(d);
-  return dt.toISOString().split('T')[0];
+//读取文件内容
+function readFile(p: string) {
+  return fs.existsSync(p) ? fs.readFileSync(p, 'utf-8') : '';
+}
+// 转义 HTML
+function escapeHtml(s: string) {
+  return s
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
 }
 
-
-// 读取 markdown
-const md = new MarkdownIt({ html: true });
-const postFiles = fs.existsSync(CONTENT_DIR)
-  ? fs.readdirSync(CONTENT_DIR).filter(f => f.endsWith('.md'))
-  : [];
-
-interface Post {
-  slug: string;
-  title: string;
-  date: string;
-  updated: string;
-  tags: string[];
-  content: string;
-  rawContent: string;
-  summary: string;
-}
-const posts: Post[] = [];
-
-for (const file of postFiles) {
-  const filePath = path.join(CONTENT_DIR, file);
-  const raw = fs.readFileSync(filePath, 'utf-8');
-  const { data, content } = matter(raw);
-  const html = md.render(content);
-  const stats = fs.statSync(filePath);
-  const slug = file.replace(/\.md$/, '');
-  const title = data.title || slug;
-  const date = data.date ? new Date(data.date).toISOString() : stats.birthtime.toISOString();
-  const updated = stats.mtime.toISOString();
-  const tags: string[] = Array.isArray(data.tags) ? data.tags.map(String) : [];
-  const summary = data.summary
-    ? String(data.summary)
-    : (content.trim().split('\n')[0] || '').slice(0, 140) + '...';
-
-  posts.push({ slug, title, date, updated, tags, content: html, rawContent: content, summary });
+// 加载文章
+const md = new MarkdownIt({ html: true }).use(mathjax3);
+const posts: any[] = [];  
+//依次读取 content/posts 下的 Markdown 文件，解析并生成文章对象
+if (fs.existsSync(CONTENT_DIR)) {
+  for (const file of fs.readdirSync(CONTENT_DIR).filter(f => f.endsWith('.md'))) {
+    const full = path.join(CONTENT_DIR, file);
+    const raw = fs.readFileSync(full, 'utf-8');
+    const { data, content } = matter(raw);
+    const html = md.render(content);
+    const stats = fs.statSync(full);
+    const slug = file.replace(/\.md$/, '');
+    const title = data.title || slug;
+    const date = data.date ? new Date(data.date).toISOString() : stats.birthtime.toISOString();
+    const updated = stats.mtime.toISOString();
+    const tags: string[] = Array.isArray(data.tags) ? data.tags.map(String) : [];
+    // 文章摘要（读取第一段）
+    const summary = data.summary
+      ? String(data.summary)
+      : (content.trim().split('\n')[0] || '').slice(0, 140) + '...';
+    posts.push({ slug, title, date, updated, tags, content: html, summary });
+  }
 }
 
-// 排序
+// 排序：date 降序
 posts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 const totalPages = Math.ceil(posts.length / POSTS_PER_PAGE);
 
-// 模板
-const headerTpl = readTemplate('header.html');
-const footerTpl = readTemplate('footer.html');
-const listTpl = readTemplate('list-template.html');
-const postTpl = readTemplate('post-template.html');
-const tagTpl = readTemplate('tag-template.html');
-
-// 清理并准备输出
+// 清理并准备输出。删除旧的 dist，重新生成。
 fs.rmSync(DIST, { recursive: true, force: true });
 ensureDir(DIST);
 if (fs.existsSync(STATIC_DIR)) {
   fs.cpSync(STATIC_DIR, path.join(DIST, 'static'), { recursive: true });
 }
-function makePagination(current: number, total: number) {
-  const pages: number[] = [];
-  for (let i = 1; i <= total; i++) pages.push(i);
-  return { current, total, pages };
+
+// 读取 header/footer（可以插入 responsive meta 和基础 CSS）
+const header = readFile(path.join(TEMPLATE_DIR, 'header.html'));
+const footer = readFile(path.join(TEMPLATE_DIR, 'footer.html'));
+
+// 生成分页导航 HTML（首页/前后/末页）
+function renderPagination(cur: number, total: number) {
+  let nav = `<div class="pagination">`;
+  if (cur > 1) {
+    nav += `<a href="${cur === 2 ? '/index.html' : '/page/' + (cur - 1) + '/index.html'}">上一页</a>`;
+  }
+  nav += ` <span>第 ${cur} / ${total} 页</span> `;
+  if (cur < total) {
+    nav += `<a href="/page/${cur + 1}/index.html">下一页</a>`;
+  }
+  nav += ` <a href="/">首页</a> <a href="/page/${total}/index.html">末页</a>`;
+  nav += `</div>`;
+  return nav;
+}
+// 生成文章列表项，每篇文章生成一个独立页面：地址：/posts/slug/index.html
+function renderPostSummary(post: any) {
+  const tagLinks = post.tags.map((t: string) => `<a href="/tags/${encodeURIComponent(t)}/index.html">${escapeHtml(t)}</a>`).join(' ');
+  return `
+  <div class="post-summary">
+    <h2><a href="/posts/${post.slug}/index.html">${escapeHtml(post.title)}</a></h2>
+    <div class="meta">
+      发布：${formatDate(post.date)}（${daysAgo(post.date)}） | 更新：${formatDate(post.updated)}（${daysAgo(post.updated)}）
+    </div>
+    <p>${escapeHtml(post.summary)}</p>
+    <div class="tags">${tagLinks}</div>
+  </div>`;
+} 
+
+// 1. 生成首页 & 分页
+for (let page = 1; page <= totalPages; page++) {
+  const start = (page - 1) * POSTS_PER_PAGE;
+  const slice = posts.slice(start, start + POSTS_PER_PAGE);
+  const listHtml = slice.map(renderPostSummary).join('\n');
+  const paginationHtml = renderPagination(page, totalPages);
+  const body = `
+  <main class="container">
+    <h1>文章列表</h1>
+    ${listHtml}
+    ${paginationHtml}
+  </main>`;
+  const full = `${header}${body}${footer}`;
+  const targetDir = page === 1 ? DIST : path.join(DIST, 'page', String(page));
+  ensureDir(targetDir);
+  fs.writeFileSync(path.join(targetDir, 'index.html'), full, 'utf-8');
 }
 
-async function generateListPages() {
-  for (let page = 1; page <= totalPages; page++) {
-    const start = (page - 1) * POSTS_PER_PAGE;
-    const pagePosts = posts.slice(start, start + POSTS_PER_PAGE);
-    const app = createSSRApp({
-      data: () => ({
-        posts: pagePosts,
-        page,
-        totalPages,
-        pagination: makePagination(page, totalPages),
-        daysAgoFn: daysAgo,
-        formatDate
-      }),
-      template: listTpl
-    });
-    const inner = await renderToString(app);
-    const full = headerTpl + inner + footerTpl;
-    const targetDir = page === 1 ? path.join(DIST) : path.join(DIST, 'page', String(page));
-    ensureDir(targetDir);
-    fs.writeFileSync(path.join(targetDir, 'index.html'), full, 'utf-8');
-  }
+// 2. 生成文章详情页
+for (const post of posts) {
+  const tagLinks = post.tags.map((t: string) => `<a href="/tags/${encodeURIComponent(t)}/index.html">${escapeHtml(t)}</a>`).join(' ');
+  const body = `
+  <main class="container">
+    <h1>${escapeHtml(post.title)}</h1>
+    <div class="meta">
+      发布：${formatDate(post.date)}（${daysAgo(post.date)}） | 更新：${formatDate(post.updated)}（${daysAgo(post.updated)}）
+    </div>
+    <div class="tags">标签：${tagLinks}</div>
+    <article class="content">${post.content}</article>
+  </main>`;
+  const full = `${header}${body}${footer}`;
+  const targetDir = path.join(DIST, 'posts', post.slug);
+  ensureDir(targetDir);
+  fs.writeFileSync(path.join(targetDir, 'index.html'), full, 'utf-8');
 }
 
-async function generatePostPages() {
-  for (const post of posts) {
-    const app = createSSRApp({
-      data: () => ({
-        title: post.title,
-        date: post.date,
-        updated: post.updated,
-        content: post.content,
-        tags: post.tags,
-        slug: post.slug,
-        daysAgoFn: daysAgo,
-        formatDate
-      }),
-      template: postTpl
-    });
-    const inner = await renderToString(app);
-    const full = headerTpl + inner + footerTpl;
-    const targetDir = path.join(DIST, 'posts', post.slug);
-    ensureDir(targetDir);
-    fs.writeFileSync(path.join(targetDir, 'index.html'), full, 'utf-8');
+// 3. 标签页
+const tagMap: Record<string, any[]> = {};
+for (const post of posts) {
+  for (const tag of post.tags) {
+    tagMap[tag] = tagMap[tag] || [];
+    tagMap[tag].push(post);
   }
 }
-
-async function generateTagPages() {
-  const tagMap: Record<string, Post[]> = {};
-  for (const post of posts) {
-    for (const tag of post.tags) {
-      tagMap[tag] = tagMap[tag] || [];
-      tagMap[tag].push(post);
-    }
-  }
-  for (const tag of Object.keys(tagMap)) {
-    const tagged = tagMap[tag];
-    tagged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const app = createSSRApp({
-      data: () => ({ tag, posts: tagged, daysAgoFn: daysAgo, formatDate }),
-      template: tagTpl
-    });
-    const inner = await renderToString(app);
-    const full = headerTpl + inner + footerTpl;
-    const targetDir = path.join(DIST, 'tags', encodeURIComponent(tag));
-    ensureDir(targetDir);
-    fs.writeFileSync(path.join(targetDir, 'index.html'), full, 'utf-8');
-  }
+for (const tag of Object.keys(tagMap)) {
+  const tagged = tagMap[tag]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .map(renderPostSummary)
+    .join('\n');
+  const body = `
+  <main class="container">
+    <h1>标签：${escapeHtml(tag)}</h1>
+    ${tagged}
+  </main>`;
+  const full = `${header}${body}${footer}`;
+  const targetDir = path.join(DIST, 'tags', tag);
+  ensureDir(targetDir);
+  fs.writeFileSync(path.join(targetDir, 'index.html'), full, 'utf-8');
 }
 
+// 4. sitemap
 function generateSitemap() {
-  const baseUrl = 'https://BLOGGEN_WEST2.com'; // 替换为你自己的域名
-  const urls: string[] = [];
-  urls.push(`${baseUrl}/`);
-  for (let i = 2; i <= totalPages; i++) {
-    urls.push(`${baseUrl}/page/${i}/`);
-  }
-  for (const post of posts) {
-    urls.push(`${baseUrl}/posts/${post.slug}/`);
-  }
-  const tags = new Set<string>();
-  posts.forEach(p => p.tags.forEach(t => tags.add(t)));
-  for (const tag of tags) {
-    urls.push(`${baseUrl}/tags/${encodeURIComponent(tag)}/`);
-  }
-  const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+  const baseUrl = 'https://example.com'; // 替换为真实域名
+  const urls = new Set<string>();
+  urls.add(`${baseUrl}/`);
+  for (let i = 2; i <= totalPages; i++) urls.add(`${baseUrl}/page/${i}/`);
+  for (const post of posts) urls.add(`${baseUrl}/posts/${post.slug}/`);
+  for (const tag of Object.keys(tagMap)) urls.add(`${baseUrl}/tags/${encodeURIComponent(tag)}/`);
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.map(u => `  <url>
+${[...urls].map(u => `  <url>
     <loc>${u}</loc>
   </url>`).join('\n')}
 </urlset>`;
-  fs.writeFileSync(path.join(DIST, 'sitemap.xml'), sitemap, 'utf-8');
+  fs.writeFileSync(path.join(DIST, 'sitemap.xml'), xml, 'utf-8');
 }
-console.log('找到的文章数量:', posts.length);
-posts.forEach(p => {
-  console.log(`- slug=${p.slug}, title=${p.title}, date=${p.date}, updated=${p.updated}, tags=${p.tags.join(',')}`);
-});
-(async function main() {
-  await generateListPages();
-  await generatePostPages();
-  await generateTagPages();
-  generateSitemap();
-  console.log('构建完成，输出在 dist/ 目录');
-})();
+generateSitemap();
+
+console.log('构建完成，文章:', posts.length);

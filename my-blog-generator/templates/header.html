@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>我的博客</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [
+            ["$", "$"],
+            ["\\(", "\\)"],
+          ], // 行内公式
+          displayMath: [
+            ["$$", "$$"],
+            ["\\[", "\\]"],
+          ], // 块级公式
+        },
+        svg: {
+          fontCache: "global",
+        },
+      };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  </head>
+  <body>
+    <header
+      class="site-header"
+      style="
+        padding: 16px;
+        background: #111;
+        color: #fff;
+        display: flex;
+        justify-content: space-between;
+      "
+    >
+      <div>
+        <a
+          href="/"
+          style="color: #fff; text-decoration: none; font-weight: bold"
+          >我的博客</a
+        >
+      </div>
+      <div><a href="/" style="color: #fff; margin-right: 12px">首页</a></div>
+    </header>
+  </body>
+</html>

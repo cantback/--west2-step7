@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>我的博客</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [
+            ["$", "$"],
+            ["\\(", "\\)"],
+          ], // 行内公式
+          displayMath: [
+            ["$$", "$$"],
+            ["\\[", "\\]"],
+          ], // 块级公式
+        },
+        svg: {
+          fontCache: "global",
+        },
+      };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  </head>
+  <body>
+    <header
+      class="site-header"
+      style="
+        padding: 16px;
+        background: #111;
+        color: #fff;
+        display: flex;
+        justify-content: space-between;
+      "
+    >
+      <div>
+        <a
+          href="/"
+          style="color: #fff; text-decoration: none; font-weight: bold"
+          >我的博客</a
+        >
+      </div>
+      <div><a href="/" style="color: #fff; margin-right: 12px">首页</a></div>
+    </header>
+  </body>
+</html>
+
+  <main class="container">
+    <h1>静态博客生成器</h1>
+    <div class="meta">
+      发布：2025-08-20（今天） | 更新：2025-08-20（今天）
+    </div>
+    <div class="tags">标签：<a href="/tags/%E8%A7%A3%E6%9E%90/index.html">解析</a></div>
+    <article class="content"><hr>
+<h1>静态博客生成器</h1>
+<p>这段代码实现了一个简易的 <strong>静态博客生成工具</strong>，使用 TypeScript/Node.js 编写。它会读取 <code>content/posts</code> 下的 Markdown 文件，解析后生成 HTML 页面，并输出到 <code>dist</code> 目录。</p>
+<p>核心功能包括：</p>
+<ul>
+<li><strong>Markdown 渲染</strong>（支持 MathJax 数学公式）</li>
+<li><strong>分页的文章列表</strong></li>
+<li><strong>文章详情页</strong></li>
+<li><strong>标签页</strong></li>
+<li><strong>站点地图 (sitemap.xml)</strong></li>
+<li><strong>静态资源复制</strong></li>
+</ul>
+<p>下面分模块解析。</p>
+<hr>
+<h2>一、目录与配置</h2>
+<pre><code class="language-ts">const POSTS_PER_PAGE = 6;
+const CONTENT_DIR = path.join(process.cwd(), 'content/posts');
+const DIST = path.join(process.cwd(), 'dist');
+const TEMPLATE_DIR = path.join(process.cwd(), 'templates');
+const STATIC_DIR = path.join(process.cwd(), 'static');
+</code></pre>
+<ul>
+<li><strong>POSTS_PER_PAGE</strong>: 每页显示 6 篇文章。</li>
+<li><strong>CONTENT_DIR</strong>: Markdown 文章存放路径。</li>
+<li><strong>DIST</strong>: 最终构建输出目录。</li>
+<li><strong>TEMPLATE_DIR</strong>: 存放 HTML 模板（头部、尾部）。</li>
+<li><strong>STATIC_DIR</strong>: 存放静态文件（CSS、JS、图片等）。</li>
+</ul>
+<hr>
+<h2>二、工具函数</h2>
+<pre><code class="language-ts">function ensureDir(p: string) { ... }
+function formatDate(d: string | Date) { ... }
+function daysAgo(date: string | Date) { ... }
+function readFile(p: string) { ... }
+function escapeHtml(s: string) { ... }
+</code></pre>
+<h3>主要功能</h3>
+<ul>
+<li><strong>ensureDir</strong>: 确保目录存在。</li>
+<li><strong>formatDate</strong>: 格式化日期，输出 <code>YYYY-MM-DD</code>。</li>
+<li><strong>daysAgo</strong>: 计算“几天前”的相对时间，如“今天”“1 天前”“X 天前”。</li>
+<li><strong>readFile</strong>: 读取文件（若不存在返回空字符串）。</li>
+<li><strong>escapeHtml</strong>: 防止 HTML 注入，对字符串做转义。</li>
+</ul>
+<hr>
+<h2>三、加载文章</h2>
+<pre><code class="language-ts">const md = new MarkdownIt({ html: true }).use(mathjax3);
+const posts: any[] = [];
+</code></pre>
+<p>这里使用了 <strong>Markdown-it</strong> 作为渲染器，并加载 <code>markdown-it-mathjax3</code> 插件，支持数学公式。</p>
+<p>然后依次读取 <code>content/posts</code> 下的 Markdown 文件，解析并生成文章对象：</p>
+<pre><code class="language-ts">const { data, content } = matter(raw);
+const html = md.render(content);
+</code></pre>
+<ul>
+<li><strong>gray-matter</strong>: 用来解析 Markdown 文件头的 <strong>YAML Front Matter</strong>（如 <code>title</code>, <code>date</code>, <code>tags</code>）。</li>
+<li><strong>content</strong>: Markdown 正文，转为 HTML。</li>
+<li><strong>stats</strong>: 文件元信息（创建时间、修改时间）。</li>
+<li><strong>summary</strong>: 优先使用 front-matter 的 <code>summary</code>，否则取正文第一行。</li>
+</ul>
+<p>最终得到的 <code>post</code> 对象包括：</p>
+<pre><code class="language-json">{
+  &quot;slug&quot;: &quot;文件名&quot;,
+  &quot;title&quot;: &quot;标题&quot;,
+  &quot;date&quot;: &quot;发布日期&quot;,
+  &quot;updated&quot;: &quot;最后修改时间&quot;,
+  &quot;tags&quot;: [&quot;标签1&quot;, &quot;标签2&quot;],
+  &quot;content&quot;: &quot;&lt;html内容&gt;&quot;,
+  &quot;summary&quot;: &quot;文章摘要&quot;
+}
+</code></pre>
+<hr>
+<h2>四、文章排序与分页</h2>
+<pre><code class="language-ts">posts.sort((a, b) =&gt; new Date(b.date).getTime() - new Date(a.date).getTime());
+const totalPages = Math.ceil(posts.length / POSTS_PER_PAGE);
+</code></pre>
+<ul>
+<li>按 <strong>日期降序</strong> 排序（最新的文章在前）。</li>
+<li>计算总页数。</li>
+</ul>
+<hr>
+<h2>五、输出准备</h2>
+<pre><code class="language-ts">fs.rmSync(DIST, { recursive: true, force: true });
+ensureDir(DIST);
+fs.cpSync(STATIC_DIR, path.join(DIST, 'static'), { recursive: true });
+</code></pre>
+<ul>
+<li>删除旧的 <code>dist</code>，重新生成。</li>
+<li>复制 <code>static</code> 目录下的静态资源到输出目录。</li>
+</ul>
+<p>并读取模板：</p>
+<pre><code class="language-ts">const header = readFile(path.join(TEMPLATE_DIR, 'header.html'));
+const footer = readFile(path.join(TEMPLATE_DIR, 'footer.html'));
+</code></pre>
+<hr>
+<h2>六、分页导航</h2>
+<pre><code class="language-ts">function renderPagination(cur: number, total: number) {
+  ...
+}
+</code></pre>
+<ul>
+<li>如果不是第一页，提供“上一页”链接。</li>
+<li>显示“第 X / Y 页”。</li>
+<li>如果不是最后一页，提供“下一页”链接。</li>
+<li>永远有“首页”和“末页”链接。</li>
+</ul>
+<hr>
+<h2>七、生成首页 &amp; 分页</h2>
+<pre><code class="language-ts">for (let page = 1; page &lt;= totalPages; page++) {
+  const slice = posts.slice(start, start + POSTS_PER_PAGE);
+  ...
+  fs.writeFileSync(path.join(targetDir, 'index.html'), full, 'utf-8');
+}
+</code></pre>
+<ul>
+<li>遍历分页，每页生成一个 <code>index.html</code>。</li>
+<li>第 1 页直接放在 <code>/dist/index.html</code>，其他页放在 <code>/dist/page/X/index.html</code>。</li>
+</ul>
+<p>页面内容包括：</p>
+<ul>
+<li><strong>文章列表</strong></li>
+<li><strong>分页导航</strong></li>
+</ul>
+<hr>
+<h2>八、生成文章详情页</h2>
+<pre><code class="language-ts">for (const post of posts) {
+  ...
+  fs.writeFileSync(path.join(targetDir, 'index.html'), full, 'utf-8');
+}
+</code></pre>
+<p>每篇文章生成一个独立页面：</p>
+<ul>
+<li>地址：<code>/posts/slug/index.html</code></li>
+<li>内容：标题、发布时间、更新时间、标签、正文</li>
+</ul>
+<hr>
+<h2>九、生成标签页</h2>
+<pre><code class="language-ts">const tagMap: Record&lt;string, any[]&gt; = {};
+</code></pre>
+<ul>
+<li>收集所有标签 → 对应文章。</li>
+<li>为每个标签生成一个列表页：
+<code>/tags/标签名/index.html</code></li>
+</ul>
+<hr>
+<h2>十、生成 Sitemap</h2>
+<pre><code class="language-ts">function generateSitemap() {
+  const baseUrl = 'https://example.com'; // 替换为真实域名
+  ...
+  fs.writeFileSync(path.join(DIST, 'sitemap.xml'), xml, 'utf-8');
+}
+</code></pre>
+<ul>
+<li>包含首页、分页、文章页、标签页。</li>
+<li>输出 <code>sitemap.xml</code>，便于搜索引擎抓取。</li>
+</ul>
+<hr>
+<h2>总结</h2>
+<p>这份 <code>build.ts</code> 脚本实现了一个简易的 <strong>静态博客生成器</strong>，主要功能如下：</p>
+<ol>
+<li>解析 Markdown 文章（支持公式）。</li>
+<li>自动提取元数据（日期、标签、摘要）。</li>
+<li>生成首页、分页、文章详情页、标签页。</li>
+<li>自动生成站点地图。</li>
+<li>支持静态资源复制和模板拼接。</li>
+</ol>
+<h3>可以改进的方向</h3>
+<ul>
+<li>添加 <strong>RSS/Atom feed</strong> 支持。</li>
+<li>优化文章摘要（比如截断 HTML 内容，而不是纯文本）。</li>
+<li>添加 <strong>归档页（按年份/月份）</strong>。</li>
+<li>添加 <strong>搜索功能（JS 前端实现）</strong>。</li>
+</ul>
+<hr>
+</article>
+  </main><footer class="site-footer">
+  <div class="inner">
+    <p>&copy; 2025 My Blog</p>
+  </div>
+</footer>
+</body>
+</html>

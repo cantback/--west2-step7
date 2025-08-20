@@ -1,15 +1,45 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://BLOGGEN_WEST2.com/</loc>
+    <loc>https://example.com/</loc>
   </url>
   <url>
-    <loc>https://BLOGGEN_WEST2.com/posts/hello-world/</loc>
+    <loc>https://example.com/page/2/</loc>
   </url>
   <url>
-    <loc>https://BLOGGEN_WEST2.com/tags/Node.js/</loc>
+    <loc>https://example.com/posts/静态博客生成器/</loc>
   </url>
   <url>
-    <loc>https://BLOGGEN_WEST2.com/tags/Vue/</loc>
+    <loc>https://example.com/posts/hello-world copy 3/</loc>
+  </url>
+  <url>
+    <loc>https://example.com/posts/hello-world copy 4/</loc>
+  </url>
+  <url>
+    <loc>https://example.com/posts/hello-world copy 5/</loc>
+  </url>
+  <url>
+    <loc>https://example.com/posts/hello-world copy 6/</loc>
+  </url>
+  <url>
+    <loc>https://example.com/posts/hello-world copy 7/</loc>
+  </url>
+  <url>
+    <loc>https://example.com/posts/hello-world copy 8/</loc>
+  </url>
+  <url>
+    <loc>https://example.com/posts/hello-world copy 9/</loc>
+  </url>
+  <url>
+    <loc>https://example.com/posts/hello-world copy/</loc>
+  </url>
+  <url>
+    <loc>https://example.com/posts/hello-world/</loc>
+  </url>
+  <url>
+    <loc>https://example.com/tags/%E8%A7%A3%E6%9E%90/</loc>
+  </url>
+  <url>
+    <loc>https://example.com/tags/%E6%B5%8B%E8%AF%95/</loc>
   </url>
 </urlset>
