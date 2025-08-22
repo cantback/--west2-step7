@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>My Blog</title>
+  <link rel="stylesheet" href="/style.css" />
+  <!-- 代码高亮 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+  <script>
+    hljs.highlightAll();
+  </script>
+  <!-- 数学公式 -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [
+          ["$", "$"],
+          ["\\(", "\\)"],
+        ],
+        displayMath: [
+          ["$$", "$$"],
+          ["\\[", "\\]"],
+        ],
+      },
+      svg: { fontCache: "global" },
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+</head>
+
+<body>
+  <header class="site-header">
+    <h1><a href="/">My Blog</a></h1>
+  </header>
+  <main class="site-main">
+<article class="post">
+  <h2>静态博客生成器</h2>
+  <div class="meta">
+    <span>发布时间: 2025-08-20</span>
+    <span>（今天）</span>
+    
+    <span>标签: 
+      <a href="/tags/解析/">解析</a> 
+    </span>
+    
+  </div>
+
+  <div class="post-content"><hr>
+<h1>静态博客生成器</h1>
+<p>这段代码实现了一个简易的 <strong>静态博客生成工具</strong>，使用 TypeScript/Node.js 编写。它会读取 <code>content/posts</code> 下的 Markdown 文件，解析后生成 HTML 页面，并输出到 <code>dist</code> 目录。</p>
+<p>核心功能包括：</p>
+<ul>
+<li><strong>Markdown 渲染</strong>（支持 MathJax 数学公式）</li>
+<li><strong>分页的文章列表</strong></li>
+<li><strong>文章详情页</strong></li>
+<li><strong>标签页</strong></li>
+<li><strong>站点地图 (sitemap.xml)</strong></li>
+<li><strong>静态资源复制</strong></li>
+</ul>
+<p>下面分模块解析。</p>
+<hr>
+<h2>一、目录与配置</h2>
+<pre class="hljs"><code><span class="hljs-keyword">const</span> <span class="hljs-variable constant_">POSTS_PER_PAGE</span> = <span class="hljs-number">6</span>;
+<span class="hljs-keyword">const</span> <span class="hljs-variable constant_">CONTENT_DIR</span> = path.<span class="hljs-title function_">join</span>(process.<span class="hljs-title function_">cwd</span>(), <span class="hljs-string">&#x27;content/posts&#x27;</span>);
+<span class="hljs-keyword">const</span> <span class="hljs-variable constant_">DIST</span> = path.<span class="hljs-title function_">join</span>(process.<span class="hljs-title function_">cwd</span>(), <span class="hljs-string">&#x27;dist&#x27;</span>);
+<span class="hljs-keyword">const</span> <span class="hljs-variable constant_">TEMPLATE_DIR</span> = path.<span class="hljs-title function_">join</span>(process.<span class="hljs-title function_">cwd</span>(), <span class="hljs-string">&#x27;templates&#x27;</span>);
+<span class="hljs-keyword">const</span> <span class="hljs-variable constant_">STATIC_DIR</span> = path.<span class="hljs-title function_">join</span>(process.<span class="hljs-title function_">cwd</span>(), <span class="hljs-string">&#x27;static&#x27;</span>);
+</code></pre>
+<ul>
+<li><strong>POSTS_PER_PAGE</strong>: 每页显示 6 篇文章。</li>
+<li><strong>CONTENT_DIR</strong>: Markdown 文章存放路径。</li>
+<li><strong>DIST</strong>: 最终构建输出目录。</li>
+<li><strong>TEMPLATE_DIR</strong>: 存放 HTML 模板（头部、尾部）。</li>
+<li><strong>STATIC_DIR</strong>: 存放静态文件（CSS、JS、图片等）。</li>
+</ul>
+<hr>
+<h2>二、工具函数</h2>
+<pre class="hljs"><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">ensureDir</span>(<span class="hljs-params"><span class="hljs-attr">p</span>: <span class="hljs-built_in">string</span></span>) { ... }
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">formatDate</span>(<span class="hljs-params"><span class="hljs-attr">d</span>: <span class="hljs-built_in">string</span> | <span class="hljs-title class_">Date</span></span>) { ... }
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">daysAgo</span>(<span class="hljs-params"><span class="hljs-attr">date</span>: <span class="hljs-built_in">string</span> | <span class="hljs-title class_">Date</span></span>) { ... }
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">readFile</span>(<span class="hljs-params"><span class="hljs-attr">p</span>: <span class="hljs-built_in">string</span></span>) { ... }
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">escapeHtml</span>(<span class="hljs-params"><span class="hljs-attr">s</span>: <span class="hljs-built_in">string</span></span>) { ... }
+</code></pre>
+<h3>主要功能</h3>
+<ul>
+<li><strong>ensureDir</strong>: 确保目录存在。</li>
+<li><strong>formatDate</strong>: 格式化日期，输出 <code>YYYY-MM-DD</code>。</li>
+<li><strong>daysAgo</strong>: 计算“几天前”的相对时间，如“今天”“1 天前”“X 天前”。</li>
+<li><strong>readFile</strong>: 读取文件（若不存在返回空字符串）。</li>
+<li><strong>escapeHtml</strong>: 防止 HTML 注入，对字符串做转义。</li>
+</ul>
+<hr>
+<h2>三、加载文章</h2>
+<pre class="hljs"><code><span class="hljs-keyword">const</span> md = <span class="hljs-keyword">new</span> <span class="hljs-title class_">MarkdownIt</span>({ <span class="hljs-attr">html</span>: <span class="hljs-literal">true</span> }).<span class="hljs-title function_">use</span>(mathjax3);
+<span class="hljs-keyword">const</span> <span class="hljs-attr">posts</span>: <span class="hljs-built_in">any</span>[] = [];
+</code></pre>
+<p>这里使用了 <strong>Markdown-it</strong> 作为渲染器，并加载 <code>markdown-it-mathjax3</code> 插件，支持数学公式。</p>
+<p>然后依次读取 <code>content/posts</code> 下的 Markdown 文件，解析并生成文章对象：</p>
+<pre class="hljs"><code><span class="hljs-keyword">const</span> { data, content } = <span class="hljs-title function_">matter</span>(raw);
+<span class="hljs-keyword">const</span> html = md.<span class="hljs-title function_">render</span>(content);
+</code></pre>
+<ul>
+<li><strong>gray-matter</strong>: 用来解析 Markdown 文件头的 <strong>YAML Front Matter</strong>（如 <code>title</code>, <code>date</code>, <code>tags</code>）。</li>
+<li><strong>content</strong>: Markdown 正文，转为 HTML。</li>
+<li><strong>stats</strong>: 文件元信息（创建时间、修改时间）。</li>
+<li><strong>summary</strong>: 优先使用 front-matter 的 <code>summary</code>，否则取正文第一行。</li>
+</ul>
+<p>最终得到的 <code>post</code> 对象包括：</p>
+<pre class="hljs"><code><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;slug&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;文件名&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;title&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;标题&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;date&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;发布日期&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;updated&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;最后修改时间&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;tags&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;标签1&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;标签2&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;content&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;&lt;html内容&gt;&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;summary&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;文章摘要&quot;</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<hr>
+<h2>四、文章排序与分页</h2>
+<pre class="hljs"><code>posts.<span class="hljs-title function_">sort</span>(<span class="hljs-function">(<span class="hljs-params">a, b</span>) =&gt;</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Date</span>(b.<span class="hljs-property">date</span>).<span class="hljs-title function_">getTime</span>() - <span class="hljs-keyword">new</span> <span class="hljs-title class_">Date</span>(a.<span class="hljs-property">date</span>).<span class="hljs-title function_">getTime</span>());
+<span class="hljs-keyword">const</span> totalPages = <span class="hljs-title class_">Math</span>.<span class="hljs-title function_">ceil</span>(posts.<span class="hljs-property">length</span> / <span class="hljs-variable constant_">POSTS_PER_PAGE</span>);
+</code></pre>
+<ul>
+<li>按 <strong>日期降序</strong> 排序（最新的文章在前）。</li>
+<li>计算总页数。</li>
+</ul>
+<hr>
+<h2>五、输出准备</h2>
+<pre class="hljs"><code>fs.<span class="hljs-title function_">rmSync</span>(<span class="hljs-variable constant_">DIST</span>, { <span class="hljs-attr">recursive</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">force</span>: <span class="hljs-literal">true</span> });
+<span class="hljs-title function_">ensureDir</span>(<span class="hljs-variable constant_">DIST</span>);
+fs.<span class="hljs-title function_">cpSync</span>(<span class="hljs-variable constant_">STATIC_DIR</span>, path.<span class="hljs-title function_">join</span>(<span class="hljs-variable constant_">DIST</span>, <span class="hljs-string">&#x27;static&#x27;</span>), { <span class="hljs-attr">recursive</span>: <span class="hljs-literal">true</span> });
+</code></pre>
+<ul>
+<li>删除旧的 <code>dist</code>，重新生成。</li>
+<li>复制 <code>static</code> 目录下的静态资源到输出目录。</li>
+</ul>
+<p>并读取模板：</p>
+<pre class="hljs"><code><span class="hljs-keyword">const</span> header = <span class="hljs-title function_">readFile</span>(path.<span class="hljs-title function_">join</span>(<span class="hljs-variable constant_">TEMPLATE_DIR</span>, <span class="hljs-string">&#x27;header.html&#x27;</span>));
+<span class="hljs-keyword">const</span> footer = <span class="hljs-title function_">readFile</span>(path.<span class="hljs-title function_">join</span>(<span class="hljs-variable constant_">TEMPLATE_DIR</span>, <span class="hljs-string">&#x27;footer.html&#x27;</span>));
+</code></pre>
+<hr>
+<h2>六、分页导航</h2>
+<pre class="hljs"><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">renderPagination</span>(<span class="hljs-params"><span class="hljs-attr">cur</span>: <span class="hljs-built_in">number</span>, <span class="hljs-attr">total</span>: <span class="hljs-built_in">number</span></span>) {
+  ...
+}
+</code></pre>
+<ul>
+<li>如果不是第一页，提供“上一页”链接。</li>
+<li>显示“第 X / Y 页”。</li>
+<li>如果不是最后一页，提供“下一页”链接。</li>
+<li>永远有“首页”和“末页”链接。</li>
+</ul>
+<hr>
+<h2>七、生成首页 &amp; 分页</h2>
+<pre class="hljs"><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> page = <span class="hljs-number">1</span>; page &lt;= totalPages; page++) {
+  <span class="hljs-keyword">const</span> slice = posts.<span class="hljs-title function_">slice</span>(start, start + <span class="hljs-variable constant_">POSTS_PER_PAGE</span>);
+  ...
+  fs.<span class="hljs-title function_">writeFileSync</span>(path.<span class="hljs-title function_">join</span>(targetDir, <span class="hljs-string">&#x27;index.html&#x27;</span>), full, <span class="hljs-string">&#x27;utf-8&#x27;</span>);
+}
+</code></pre>
+<ul>
+<li>遍历分页，每页生成一个 <code>index.html</code>。</li>
+<li>第 1 页直接放在 <code>/dist/index.html</code>，其他页放在 <code>/dist/page/X/index.html</code>。</li>
+</ul>
+<p>页面内容包括：</p>
+<ul>
+<li><strong>文章列表</strong></li>
+<li><strong>分页导航</strong></li>
+</ul>
+<hr>
+<h2>八、生成文章详情页</h2>
+<pre class="hljs"><code><span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> post <span class="hljs-keyword">of</span> posts) {
+  ...
+  fs.<span class="hljs-title function_">writeFileSync</span>(path.<span class="hljs-title function_">join</span>(targetDir, <span class="hljs-string">&#x27;index.html&#x27;</span>), full, <span class="hljs-string">&#x27;utf-8&#x27;</span>);
+}
+</code></pre>
+<p>每篇文章生成一个独立页面：</p>
+<ul>
+<li>地址：<code>/posts/slug/index.html</code></li>
+<li>内容：标题、发布时间、更新时间、标签、正文</li>
+</ul>
+<hr>
+<h2>九、生成标签页</h2>
+<pre class="hljs"><code><span class="hljs-keyword">const</span> <span class="hljs-attr">tagMap</span>: <span class="hljs-title class_">Record</span>&lt;<span class="hljs-built_in">string</span>, <span class="hljs-built_in">any</span>[]&gt; = {};
+</code></pre>
+<ul>
+<li>收集所有标签 → 对应文章。</li>
+<li>为每个标签生成一个列表页：
+<code>/tags/标签名/index.html</code></li>
+</ul>
+<hr>
+<h2>十、生成 Sitemap</h2>
+<pre class="hljs"><code><span class="hljs-keyword">function</span> <span class="hljs-title function_">generateSitemap</span>(<span class="hljs-params"></span>) {
+  <span class="hljs-keyword">const</span> baseUrl = <span class="hljs-string">&#x27;https://example.com&#x27;</span>; <span class="hljs-comment">// 替换为真实域名</span>
+  ...
+  fs.<span class="hljs-title function_">writeFileSync</span>(path.<span class="hljs-title function_">join</span>(<span class="hljs-variable constant_">DIST</span>, <span class="hljs-string">&#x27;sitemap.xml&#x27;</span>), xml, <span class="hljs-string">&#x27;utf-8&#x27;</span>);
+}
+</code></pre>
+<ul>
+<li>包含首页、分页、文章页、标签页。</li>
+<li>输出 <code>sitemap.xml</code>，便于搜索引擎抓取。</li>
+</ul>
+<hr>
+<h2>总结</h2>
+<p>这份 <code>build.ts</code> 脚本实现了一个简易的 <strong>静态博客生成器</strong>，主要功能如下：</p>
+<ol>
+<li>解析 Markdown 文章（支持公式）。</li>
+<li>自动提取元数据（日期、标签、摘要）。</li>
+<li>生成首页、分页、文章详情页、标签页。</li>
+<li>自动生成站点地图。</li>
+<li>支持静态资源复制和模板拼接。</li>
+</ol>
+<h3>可以改进的方向</h3>
+<ul>
+<li>添加 <strong>RSS/Atom feed</strong> 支持。</li>
+<li>优化文章摘要（比如截断 HTML 内容，而不是纯文本）。</li>
+<li>添加 <strong>归档页（按年份/月份）</strong>。</li>
+<li>添加 <strong>搜索功能（JS 前端实现）</strong>。</li>
+</ul>
+<hr>
+</div>
+</article>
+</main>
+  <footer class="site-footer">
+    <p>© step 7</p>
+  </footer>
+</body>
+
+</html>

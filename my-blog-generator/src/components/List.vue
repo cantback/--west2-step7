@@ -1,4 +1,4 @@
-<template>
+<!-- <template>
   <div class="list">
     <h1>文章列表</h1>
     <div v-for="post in posts" :key="post.slug" class="post-summary">
@@ -53,4 +53,4 @@ function daysAgo(d: string) {
   if (days === 1) return '1 天前';
   return `${days} 天前`;
 }
-</script>
+</script> -->

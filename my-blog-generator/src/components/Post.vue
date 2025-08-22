@@ -1,4 +1,4 @@
-<template>
+<!-- <template>
   <div class="post">
     <h1>{{ title }}</h1>
     <div class="meta">
@@ -35,4 +35,4 @@ function daysAgo(d: string) {
   return `${days} 天前`;
 }
 
-</script>
+</script> -->

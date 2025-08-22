@@ -1,43 +1,172 @@
-<div style="max-width: 840px; margin: 40px auto; font-family: system-ui">
-  <h1>文章列表</h1>
-  <div
-    v-for="post in posts"
-    :key="post.slug"
-    style="padding: 16px 0; border-bottom: 1px solid #ddd"
-  >
-    <h2>
-      <a
-        :href="'/posts/' + post.slug + '/index.html'"
-        style="text-decoration: none; color: #222"
-        >{{ post.title }}</a
-      >
-    </h2>
-    <div style="font-size: 12px; color: #555">
-      发布：{{ formatDate(post.date) }}（{{ daysAgoFn(post.date) }}）
-    </div>
-    <p>{{ post.summary }}</p>
-    <div>
-      <span v-if="post.tags && post.tags.length"
-        >标签：
-        <span v-for="t in post.tags" :key="t"
-          ><a :href="'/tags/' + encodeURIComponent(t) + '/index.html'"
-            >{{ t }}</a
-          >&nbsp;</span
-        >
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <div class="post-list">
+    {% for post in posts %}
+    <article class="post-item">
+      <h2><a href="posts/{{ post.slug }}.html">{{ post.title }}</a></h2>
+      <p class="post-meta">{{ post.date | formatDate }} · {{ post.date | daysAgo }}</p>
+
+      {% if post.tags.length %}
+      <span>标签: {% for tag in post.tags %}
+        <a href="/tags/{{ tag }}/">{{ tag }}</a>{% if not loop.last %}, {% endif
+        %} {% endfor %}
       </span>
-    </div>
+      {% endif %}
+
+      <div class="post-excerpt">{{ post.excerpt | safe }}</div>
+    </article>
+    {% endfor %}
   </div>
-  <div style="margin-top: 24px; display: flex; gap: 8px">
-    <a
-      v-if="page > 1"
-      :href="page===2 ? '/index.html' : '/page/' + (page-1) + '/index.html'"
-      >上一页</a
-    >
-    <span>第 {{ page }} / {{ totalPages }} 页</span>
-    <a v-if="page < totalPages" :href="'/page/' + (page+1) + '/index.html'"
-      >下一页</a
-    >
-    <a href="/">首页</a>
-    <a :href="'/page/' + totalPages + '/index.html'">末页</a>
-  </div>
+
+  {# 分页容器：把 totalPages 注入到 data-total-pages 属性，不做裸变量注入 #}
+  <nav class="pagination" aria-label="分页导航" data-total-pages="{{ totalPages | default(0) }}">
+    {% set total = totalPages %}
+    {% set cur = currentPage %}
+
+    {# 仅在不是第一页时显示：首页、上一页 #}
+    {% if cur > 1 %}
+    <a href="index.html" class="first">首页</a>
+    {% set prev = cur - 1 %}
+    {% if prev == 1 %}
+    <a href="index.html" class="prev">上一页</a>
+    {% else %}
+    <a href="page{{ prev }}.html" class="prev">上一页</a>
+    {% endif %}
+    {% endif %}
+
+    {# 显示页码（同之前策略） #}
+    {% if total <= 7 %} {% for i in pages %} {% if i==cur %} <span class="current" aria-current="page">{{ i }}</span>
+      {% else %}
+      {% if i == 1 %}
+      <a href="index.html">{{ i }}</a>
+      {% else %}
+      <a href="page{{ i }}.html">{{ i }}</a>
+      {% endif %}
+      {% endif %}
+      {% endfor %}
+      {% else %}
+      {% set start = cur - 1 %}
+      {% if start < 3 %}{% set start=3 %}{% endif %} {% set end=cur + 1 %} {% if end> total - 2 %}{% set end = total - 2
+        %}{% endif %}
+
+        <a href="index.html">1</a>
+        <a href="page2.html">2</a>
+
+        {% if start > 3 %}
+        <span class="ellipsis">…</span>
+        {% endif %}
+
+        {% for i in pages %}
+        {% if i >= start and i <= end %} {% if i==cur %} <span class="current" aria-current="page">{{ i }}</span>
+          {% else %}
+          {% if i == 1 %}
+          <a href="index.html">{{ i }}</a>
+          {% else %}
+          <a href="page{{ i }}.html">{{ i }}</a>
+          {% endif %}
+          {% endif %}
+          {% endif %}
+          {% endfor %}
+
+          {% if end < total - 2 %} <span class="ellipsis">…</span>
+            {% endif %}
+
+            {% if total - 1 == 1 %}
+            <a href="index.html">{{ total - 1 }}</a>
+            {% else %}
+            <a href="page{{ total - 1 }}.html">{{ total - 1 }}</a>
+            {% endif %}
+
+            {% if total == 1 %}
+            <a href="index.html">{{ total }}</a>
+            {% else %}
+            <a href="page{{ total }}.html">{{ total }}</a>
+            {% endif %}
+            {% endif %}
+
+            {# 仅在不是最后一页时显示：下一页、末页 #}
+            {% if cur < total %} {% set next=cur + 1 %} {% if next==1 %} <a href="index.html" class="next">下一页</a>
+              {% else %}
+              <a href="page{{ next }}.html" class="next">下一页</a>
+              {% endif %}
+              {% if total == 1 %}
+              <a href="index.html" class="last">末页</a>
+              {% else %}
+              <a href="page{{ total }}.html" class="last">末页</a>
+              {% endif %}
+              {% endif %}
+
+              {# 快速跳转输入框 #}
+              <span class="goto-wrapper" style="margin-left:12px; display:inline-flex; gap:6px; align-items:center;">
+                <label for="goto-page" style="font-size:0.95rem;">第</label>
+                <input id="goto-page" type="number" min="1" max="{{ total }}" placeholder="{{ cur }}" aria-label="页码输入"
+                  style="width:88px;padding:6px;border-radius:6px;border:1px solid #ddd" />
+                <label style="font-size:0.95rem;">页</label>
+                <button id="goto-btn" type="button"
+                  style="padding:6px 10px;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer;">跳转</button>
+                <span id="goto-msg" style="display:none;color:#b91c1c;margin-left:8px;font-size:0.95rem;"></span>
+              </span>
+  </nav>
 </div>
+
+<script>
+  /* IIFE + 幂等保护；从 DOM data-* 读取 totalPages（避免裸变量注入导致 ReferenceError） */
+  (function () {
+    if (window.__paginationInitialized) return;
+    window.__paginationInitialized = true;
+
+    // 从分页节点读取 totalPages
+    var nav = document.querySelector('.pagination');
+    var total = 0;
+    if (nav && nav.dataset && nav.dataset.totalPages) {
+      total = parseInt(nav.dataset.totalPages, 10) || 0;
+    }
+
+    var input = document.getElementById('goto-page');
+    var btn = document.getElementById('goto-btn');
+    var msg = document.getElementById('goto-msg');
+
+    if (!btn || !input) return;
+
+    function toUrl(p) {
+      p = Number(p) || 1;
+      return p <= 1 ? 'index.html' : 'page' + p + '.html';
+    }
+
+    function showMsg(text) {
+      if (!msg) {
+        alert(text); // 兜底
+        return;
+      }
+      msg.textContent = text;
+      msg.style.display = 'inline';
+      setTimeout(function () {
+        msg.style.display = 'none';
+        msg.textContent = '';
+      }, 3000);
+    }
+
+    btn.addEventListener('click', function () {
+      var v = parseInt(input.value, 10);
+      if (isNaN(v)) {
+        showMsg('请输入页码数字');
+        return;
+      }
+      if (v < 1) v = 1;
+      if (v > total) {
+        showMsg('超出最大页数：共 ' + total + ' 页');
+        input.value = total;
+        return;
+      }
+      location.href = toUrl(v);
+    });
+
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        btn.click();
+      }
+    });
+  })();
+</script>
+{% endblock %}

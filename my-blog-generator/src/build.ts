@@ -1,193 +1,237 @@
-import fs from 'fs';
-import path from 'path';
-import matter from 'gray-matter';
-import MarkdownIt from 'markdown-it';
-import mathjax3 from "markdown-it-mathjax3";   //数学公式插件
+import fs from "fs";
+import path from "path";
+import matter from "gray-matter";
+import nunjucks from "nunjucks";
+import MarkdownIt from "markdown-it";
+import mila from "markdown-it-link-attributes";
+import hljs from "highlight.js";
+import mathjax3 from "markdown-it-mathjax3";
 
-// 配置
-const POSTS_PER_PAGE = 6;
-const CONTENT_DIR = path.join(process.cwd(), 'content/posts');  //文章目录
-const DIST = path.join(process.cwd(), 'dist');
-const TEMPLATE_DIR = path.join(process.cwd(), 'templates');
-const STATIC_DIR = path.join(process.cwd(), 'static');
+// 路径
+const CONTENT_DIR = path.join(process.cwd(), "content", "posts");
+const OUTPUT_DIR = path.join(process.cwd(), "dist");
+const TEMPLATE_DIR = path.join(process.cwd(), "templates");
 
-// 工具
-//确保目录存在
-function ensureDir(p: string) {
-  fs.mkdirSync(p, { recursive: true });
-}   
-//格式化日期
-function formatDate(d: string | Date) {
-  const dt = new Date(d);
-  return dt.toISOString().split('T')[0];
-}  
-//计算几天前
-function daysAgo(date: string | Date) {
-  const now = Date.now();
-  const d = new Date(date).getTime();
-  const diff = Math.max(0, now - d);
+// Markdown 渲染器（带数学与高亮）
+const md: MarkdownIt = new MarkdownIt({
+  html: true,
+  linkify: true,
+  typographer: true,
+  highlight: (str: string, lang: string | undefined): string => {
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        return `<pre class="hljs"><code>${hljs.highlight(str, { language: lang, ignoreIllegals: true }).value}</code></pre>`;
+      } catch (__) {}
+    }
+    return `<pre class="hljs"><code>${md.utils.escapeHtml(str)}</code></pre>`;
+  },
+})
+  .use(mathjax3)
+  .use(mila, {
+    attrs: {
+      target: "_blank",
+      rel: "noopener",
+    },
+  });
+
+// 配置 nunjucks（使用同一个 env，这样 addFilter 生效）
+const env = nunjucks.configure(TEMPLATE_DIR, { autoescape: false });
+
+// 注册日期/相对时间过滤器
+env.addFilter("formatDate", function (dateStr: string, format = "YYYY-MM-DD") {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  if (format === "YYYY-MM-DD") return `${year}-${month}-${day}`;
+  if (format === "YYYY/MM/DD") return `${year}/${month}/${day}`;
+  return d.toISOString();
+});
+
+env.addFilter("daysAgo", function (dateStr: string) {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return "未知日期";
+  const now = new Date();
+  const diff = now.getTime() - d.getTime();
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  if (days === 0) return '今天';
-  if (days === 1) return '1 天前';
+  if (days <= 0) return "今天";
   return `${days} 天前`;
-}
-//读取文件内容
-function readFile(p: string) {
-  return fs.existsSync(p) ? fs.readFileSync(p, 'utf-8') : '';
-}
-// 转义 HTML
-function escapeHtml(s: string) {
-  return s
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;')
-  .replace(/'/g, '&#39;');
+});
+
+// 确保输出目录存在
+if (!fs.existsSync(OUTPUT_DIR)) {
+  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 }
 
-// 加载文章
-const md = new MarkdownIt({ html: true }).use(mathjax3);
-const posts: any[] = [];  
-//依次读取 content/posts 下的 Markdown 文件，解析并生成文章对象
-if (fs.existsSync(CONTENT_DIR)) {
-  for (const file of fs.readdirSync(CONTENT_DIR).filter(f => f.endsWith('.md'))) {
-    const full = path.join(CONTENT_DIR, file);
-    const raw = fs.readFileSync(full, 'utf-8');
-    const { data, content } = matter(raw);
-    const html = md.render(content);
-    const stats = fs.statSync(full);
-    const slug = file.replace(/\.md$/, '');
-    const title = data.title || slug;
-    const date = data.date ? new Date(data.date).toISOString() : stats.birthtime.toISOString();
-    const updated = stats.mtime.toISOString();
-    const tags: string[] = Array.isArray(data.tags) ? data.tags.map(String) : [];
-    // 文章摘要（读取第一段）
-    const summary = data.summary
-      ? String(data.summary)
-      : (content.trim().split('\n')[0] || '').slice(0, 140) + '...';
-    posts.push({ slug, title, date, updated, tags, content: html, summary });
+interface Post {
+  title: string;
+  date: string;
+  tags: string[];
+  content: string; // 渲染后的 HTML
+  rawContent: string; // 原始 markdown
+  slug: string;
+  excerpt: string; // 列表页摘要
+}
+
+// 如果 Markdown 没有 front-matter，则自动补上并写回文件
+function ensureFrontMatter(filePath: string) {
+  const raw = fs.readFileSync(filePath, "utf-8");
+  const parsed = matter(raw);
+  if (!parsed.data || Object.keys(parsed.data).length === 0) {
+    const slug = path.basename(filePath).replace(/\.md$/, "");
+    const fm = {
+      title: slug,
+      date: new Date().toISOString(),
+      tags: [],
+    } as any;
+    const newRaw = matter.stringify(parsed.content, fm);
+    fs.writeFileSync(filePath, newRaw, "utf-8");
+    return { data: fm, content: parsed.content };
+  }
+  return parsed;
+}
+
+function stripTags(html: string) {
+  return html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+}
+
+function makeExcerptFromHtml(html: string, maxLen = 200) {
+  // 尝试取第一个段落
+  const m = html.match(/<p>([\s\S]*?)<\/p>/i);
+  let txt = m ? stripTags(m[1]) : stripTags(html);
+  if (txt.length > maxLen) txt = txt.slice(0, maxLen).trim() + "...";
+  return txt;
+}
+
+function loadPosts(): Post[] {
+  if (!fs.existsSync(CONTENT_DIR)) return [];
+  const files = fs.readdirSync(CONTENT_DIR).filter(f => f.endsWith(".md"));
+
+  const posts: Post[] = files.map(file => {
+    const filePath = path.join(CONTENT_DIR, file);
+    const parsed = ensureFrontMatter(filePath);
+    const data = parsed.data || {};
+    const rawContent = parsed.content || "";
+    const rendered = md.render(rawContent);
+
+    const slug = file.replace(/\.md$/, "");
+
+    const excerpt = makeExcerptFromHtml(rendered, 220);
+
+    return {
+      title: data.title || slug,
+      date: data.date || new Date().toISOString(),
+      tags: data.tags || [],
+      content: rendered,
+      rawContent,
+      slug,
+      excerpt,
+    } as Post;
+  });
+
+  // 按日期降序排列
+  return posts.sort((a, b) => +new Date(b.date) - +new Date(a.date));
+}
+
+// 生成文章页
+function buildPosts(posts: Post[]) {
+  const postsDir = path.join(OUTPUT_DIR, "posts");
+  fs.mkdirSync(postsDir, { recursive: true });
+  posts.forEach(post => {
+    // 传入 post 对象，模板使用 post.title / post.content 等
+    const html = env.render("post-template.html", { post });
+    fs.writeFileSync(path.join(postsDir, `${post.slug}.html`), html, "utf-8");
+  });
+}
+
+// 生成文章列表页（带分页）
+function buildList(posts: Post[], perPage = 5) {
+  const totalPages = Math.ceil(posts.length / perPage);
+  const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+  for (let page = 1; page <= totalPages; page++) {
+    const start = (page - 1) * perPage;
+    const end = start + perPage;
+    const pagePosts = posts.slice(start, end);
+
+    const html = env.render("list-template.html", {
+      posts: pagePosts,
+      currentPage: page,
+      totalPages,
+      pages,
+    });
+
+    const filePath = page === 1
+      ? path.join(OUTPUT_DIR, "index.html")
+      : path.join(OUTPUT_DIR, `page${page}.html`);
+
+    fs.writeFileSync(filePath, html, "utf-8");
   }
 }
 
-// 排序：date 降序
-posts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-const totalPages = Math.ceil(posts.length / POSTS_PER_PAGE);
+// 生成标签页
+function buildTags(posts: Post[]) {
+  const tagMap: Record<string, Post[]> = {};
 
-// 清理并准备输出。删除旧的 dist，重新生成。
-fs.rmSync(DIST, { recursive: true, force: true });
-ensureDir(DIST);
-if (fs.existsSync(STATIC_DIR)) {
-  fs.cpSync(STATIC_DIR, path.join(DIST, 'static'), { recursive: true });
+  posts.forEach(post => {
+    (post.tags || []).forEach(tag => {
+      if (!tagMap[tag]) tagMap[tag] = [];
+      tagMap[tag].push(post);
+    });
+  });
+
+  const tagDir = path.join(OUTPUT_DIR, "tags");
+  fs.mkdirSync(tagDir, { recursive: true });
+
+  Object.entries(tagMap).forEach(([tag, tagPosts]) => {
+    const dir = path.join(tagDir, tag);
+    fs.mkdirSync(dir, { recursive: true });
+
+    const html = env.render("list-template.html", {
+      tag,
+      posts: tagPosts,
+    });
+
+    fs.writeFileSync(path.join(dir, "index.html"), html, "utf-8");
+  });
 }
 
-// 读取 header/footer（可以插入 responsive meta 和基础 CSS）
-const header = readFile(path.join(TEMPLATE_DIR, 'header.html'));
-const footer = readFile(path.join(TEMPLATE_DIR, 'footer.html'));
+// 生成 sitemap.xml（指向实际生成的 HTML）
+function buildSitemap(posts: Post[]) {
+  const urls = [
+    { loc: "/", lastmod: new Date().toISOString() },
+    ...posts.map(p => ({ loc: `/posts/${p.slug}.html`, lastmod: p.date })),
+  ];
 
-// 生成分页导航 HTML（首页/前后/末页）
-function renderPagination(cur: number, total: number) {
-  let nav = `<div class="pagination">`;
-  if (cur > 1) {
-    nav += `<a href="${cur === 2 ? '/index.html' : '/page/' + (cur - 1) + '/index.html'}">上一页</a>`;
-  }
-  nav += ` <span>第 ${cur} / ${total} 页</span> `;
-  if (cur < total) {
-    nav += `<a href="/page/${cur + 1}/index.html">下一页</a>`;
-  }
-  nav += ` <a href="/">首页</a> <a href="/page/${total}/index.html">末页</a>`;
-  nav += `</div>`;
-  return nav;
-}
-// 生成文章列表项，每篇文章生成一个独立页面：地址：/posts/slug/index.html
-function renderPostSummary(post: any) {
-  const tagLinks = post.tags.map((t: string) => `<a href="/tags/${encodeURIComponent(t)}/index.html">${escapeHtml(t)}</a>`).join(' ');
-  return `
-  <div class="post-summary">
-    <h2><a href="/posts/${post.slug}/index.html">${escapeHtml(post.title)}</a></h2>
-    <div class="meta">
-      发布：${formatDate(post.date)}（${daysAgo(post.date)}） | 更新：${formatDate(post.updated)}（${daysAgo(post.updated)}）
-    </div>
-    <p>${escapeHtml(post.summary)}</p>
-    <div class="tags">${tagLinks}</div>
-  </div>`;
-} 
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    urls.map(u =>
+      ` <url>\n <loc>${u.loc}</loc>\n <lastmod>${u.lastmod}</lastmod>\n </url>`
+    ).join("\n") +
+    `\n</urlset>`;
 
-// 1. 生成首页 & 分页
-for (let page = 1; page <= totalPages; page++) {
-  const start = (page - 1) * POSTS_PER_PAGE;
-  const slice = posts.slice(start, start + POSTS_PER_PAGE);
-  const listHtml = slice.map(renderPostSummary).join('\n');
-  const paginationHtml = renderPagination(page, totalPages);
-  const body = `
-  <main class="container">
-    <h1>文章列表</h1>
-    ${listHtml}
-    ${paginationHtml}
-  </main>`;
-  const full = `${header}${body}${footer}`;
-  const targetDir = page === 1 ? DIST : path.join(DIST, 'page', String(page));
-  ensureDir(targetDir);
-  fs.writeFileSync(path.join(targetDir, 'index.html'), full, 'utf-8');
+  fs.writeFileSync(path.join(OUTPUT_DIR, "sitemap.xml"), xml, "utf-8");
 }
 
-// 2. 生成文章详情页
-for (const post of posts) {
-  const tagLinks = post.tags.map((t: string) => `<a href="/tags/${encodeURIComponent(t)}/index.html">${escapeHtml(t)}</a>`).join(' ');
-  const body = `
-  <main class="container">
-    <h1>${escapeHtml(post.title)}</h1>
-    <div class="meta">
-      发布：${formatDate(post.date)}（${daysAgo(post.date)}） | 更新：${formatDate(post.updated)}（${daysAgo(post.updated)}）
-    </div>
-    <div class="tags">标签：${tagLinks}</div>
-    <article class="content">${post.content}</article>
-  </main>`;
-  const full = `${header}${body}${footer}`;
-  const targetDir = path.join(DIST, 'posts', post.slug);
-  ensureDir(targetDir);
-  fs.writeFileSync(path.join(targetDir, 'index.html'), full, 'utf-8');
-}
+function copyStyle() {
+  const src = path.join(process.cwd(), "static", "style.css");
+  const dest = path.join(OUTPUT_DIR, "style.css");
 
-// 3. 标签页
-const tagMap: Record<string, any[]> = {};
-for (const post of posts) {
-  for (const tag of post.tags) {
-    tagMap[tag] = tagMap[tag] || [];
-    tagMap[tag].push(post);
+  if (fs.existsSync(src)) {
+    fs.copyFileSync(src, dest);
+    console.log("✅ style.css copied to dist/");
+  } else {
+    console.warn("⚠️ style.css not found in project root.");
   }
 }
-for (const tag of Object.keys(tagMap)) {
-  const tagged = tagMap[tag]
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .map(renderPostSummary)
-    .join('\n');
-  const body = `
-  <main class="container">
-    <h1>标签：${escapeHtml(tag)}</h1>
-    ${tagged}
-  </main>`;
-  const full = `${header}${body}${footer}`;
-  const targetDir = path.join(DIST, 'tags', tag);
-  ensureDir(targetDir);
-  fs.writeFileSync(path.join(targetDir, 'index.html'), full, 'utf-8');
-}
 
-// 4. sitemap
-function generateSitemap() {
-  const baseUrl = 'https://example.com'; // 替换为真实域名
-  const urls = new Set<string>();
-  urls.add(`${baseUrl}/`);
-  for (let i = 2; i <= totalPages; i++) urls.add(`${baseUrl}/page/${i}/`);
-  for (const post of posts) urls.add(`${baseUrl}/posts/${post.slug}/`);
-  for (const tag of Object.keys(tagMap)) urls.add(`${baseUrl}/tags/${encodeURIComponent(tag)}/`);
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${[...urls].map(u => `  <url>
-    <loc>${u}</loc>
-  </url>`).join('\n')}
-</urlset>`;
-  fs.writeFileSync(path.join(DIST, 'sitemap.xml'), xml, 'utf-8');
-}
-generateSitemap();
+// 执行构建
+const posts = loadPosts();
+buildPosts(posts);
+buildList(posts);
+buildTags(posts);
+buildSitemap(posts);
+copyStyle();
 
-console.log('构建完成，文章:', posts.length);
+console.log(`Built ${posts.length} posts → ${OUTPUT_DIR}`);
