@@ -19,7 +19,7 @@
     {% endfor %}
   </div>
 
-  {# 分页容器：把 totalPages 注入到 data-total-pages 属性，不做裸变量注入 #}
+  {# 分页容器：把 totalPages 注入到 data-total-pages 属性 #}
   <nav class="pagination" aria-label="分页导航" data-total-pages="{{ totalPages | default(0) }}">
     {% set total = totalPages %}
     {% set cur = currentPage %}
@@ -35,7 +35,7 @@
     {% endif %}
     {% endif %}
 
-    {# 显示页码（同之前策略） #}
+    {# 显示页码 #}
     {% if total <= 7 %} {% for i in pages %} {% if i==cur %} <span class="current" aria-current="page">{{ i }}</span>
       {% else %}
       {% if i == 1 %}
@@ -111,12 +111,11 @@
 </div>
 
 <script>
-  /* IIFE + 幂等保护；从 DOM data-* 读取 totalPages（避免裸变量注入导致 ReferenceError） */
   (function () {
     if (window.__paginationInitialized) return;
     window.__paginationInitialized = true;
 
-    // 从分页节点读取 totalPages
+    // 读取 totalPages
     var nav = document.querySelector('.pagination');
     var total = 0;
     if (nav && nav.dataset && nav.dataset.totalPages) {
@@ -136,7 +135,7 @@
 
     function showMsg(text) {
       if (!msg) {
-        alert(text); // 兜底
+        alert(text); // 避免不知道的错误情况，直接弹出提示
         return;
       }
       msg.textContent = text;

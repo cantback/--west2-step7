@@ -6,13 +6,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Blog</title>
   <link rel="stylesheet" href="/style.css" />
-  <!-- 代码高亮 -->
+  <!-- 代码高亮样式 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
   <script>
     hljs.highlightAll();
   </script>
-  <!-- 数学公式 -->
+  <!-- 数学公式样式 -->
   <script>
     window.MathJax = {
       tex: {
@@ -34,6 +34,9 @@
 <body>
   <header class="site-header">
     <h1><a href="/">My Blog</a></h1>
+    <nav style="margin-top:6px; display: flex;">
+      <a href="/search.html">搜索</a>
+    </nav>
   </header>
   <main class="site-main">
 <div class="container">
@@ -41,7 +44,7 @@
     
     <article class="post-item">
       <h2><a href="posts/hello-world copy.html">我的第一篇博客</a></h2>
-      <p class="post-meta">2025-07-20 · 31 天前</p>
+      <p class="post-meta">2025-07-20 · 34 天前</p>
 
       
       <span>标签: 
@@ -54,7 +57,7 @@
     
     <article class="post-item">
       <h2><a href="posts/hello-world.html">我的第一篇博客</a></h2>
-      <p class="post-meta">2025-07-01 · 50 天前</p>
+      <p class="post-meta">2025-07-01 · 53 天前</p>
 
       
       <span>标签: 
@@ -124,12 +127,11 @@
 </div>
 
 <script>
-  /* IIFE + 幂等保护；从 DOM data-* 读取 totalPages（避免裸变量注入导致 ReferenceError） */
   (function () {
     if (window.__paginationInitialized) return;
     window.__paginationInitialized = true;
 
-    // 从分页节点读取 totalPages
+    // 读取 totalPages
     var nav = document.querySelector('.pagination');
     var total = 0;
     if (nav && nav.dataset && nav.dataset.totalPages) {
@@ -149,7 +151,7 @@
 
     function showMsg(text) {
       if (!msg) {
-        alert(text); // 兜底
+        alert(text); // 避免不知道的错误情况，直接弹出提示
         return;
       }
       msg.textContent = text;

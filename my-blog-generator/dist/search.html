@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Search</title>
+  <link rel="stylesheet" href="/style.css" />
+  <!-- 代码高亮样式 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+  <script>
+    hljs.highlightAll();
+  </script>
+  <!-- 数学公式样式 -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [
+          ["$", "$"],
+          ["\\(", "\\)"],
+        ],
+        displayMath: [
+          ["$$", "$$"],
+          ["\\[", "\\]"],
+        ],
+      },
+      svg: { fontCache: "global" },
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+</head>
+
+<body>
+  <header class="site-header">
+    <h1><a href="/">My Blog</a></h1>
+    <nav style="margin-top:6px; display: flex;">
+      <a href="/search.html">搜索</a>
+    </nav>
+  </header>
+  <main class="site-main">
+<!-- 搜索页面主体（继承 base.html，不修改 base） -->
+<div class="container" style="max-width:980px;margin:22px auto;">
+    <h2>站内搜索</h2>
+
+    <div style="margin:12px 0;">
+        <div id="search-root" class="search-wrapper" style="position:relative;max-width:720px;">
+            <div class="search-input"
+                style="display:flex;align-items:center;gap:8px;border-radius:999px;padding:8px 12px;border:1px solid #e6e6e6;box-shadow:0 1px 3px rgba(16,24,40,0.06);background:#fff;">
+                <svg class="icon" viewBox="0 0 24 24" width="18" height="18" style="opacity:.7">
+                    <path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                    <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                </svg>
+                <input id="search-input" type="search" placeholder="搜索文章标题 / 标签 / 内容" aria-label="站内搜索"
+                    autocomplete="off" style="border:none;outline:none;font-size:0.98rem;flex:1;min-width:0" />
+                <button id="search-clear" title="清除"
+                    style="display:none;background:transparent;border:none;cursor:pointer;padding:4px;font-size:14px;color:#666">✕</button>
+            </div>
+
+            <!-- 下拉结果（下拉风格也在此页面可查看） -->
+            <div id="search-dropdown" class="search-dropdown"
+                style="display:none;position:absolute;left:0;right:0;margin-top:10px;background:#fff;border-radius:10px;box-shadow:0 8px 30px rgba(15,23,42,0.08);border:1px solid rgba(0,0,0,0.04);overflow:hidden;max-height:420px;z-index:80">
+                <div id="search-state" class="search-loading" style="padding:14px;text-align:center;color:#666">
+                    在输入框中输入开始搜索</div>
+                <ul id="search-list" class="search-list" role="listbox" tabindex="-1" aria-label="搜索结果"
+                    style="list-style:none;margin:0;padding:6px 0;max-height:360px;overflow:auto"></ul>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- 页面内简单样式（可移动到 style.css） -->
+<style>
+    .search-item {
+        padding: 10px 14px;
+        display: block;
+        border-left: 4px solid transparent;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .search-item:hover,
+    .search-item[aria-selected="true"] {
+        background: rgba(15, 23, 42, 0.03);
+        border-left-color: #2563eb;
+    }
+
+    .search-item .title {
+        font-weight: 600;
+        font-size: 0.98rem;
+        margin-bottom: 6px;
+    }
+
+    .search-item .meta {
+        font-size: 0.85rem;
+        color: #666;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .search-item .excerpt {
+        margin-top: 6px;
+        color: #444;
+        font-size: 0.9rem;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .tag-pill {
+        font-size: 0.78rem;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        background: #fbfbff;
+        color: #333;
+    }
+</style>
+
+<!-- 搜索脚本：懒加载 Fuse + search.json，支持下拉、键盘上下回车、Esc、/ 聚焦 -->
+<script>
+    (async function () {
+        const input = document.getElementById('search-input');
+        const clearBtn = document.getElementById('search-clear');
+        const dropdown = document.getElementById('search-dropdown');
+        const state = document.getElementById('search-state');
+        const list = document.getElementById('search-list');
+
+        let fuse = null, docs = [], loaded = false, selected = -1, lastQuery = '';
+        const MAX_RESULTS = 8;
+
+        function esc(s) { return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
+
+        function openDropdown() { dropdown.style.display = 'block'; dropdown.setAttribute('aria-hidden', 'false'); }
+        function closeDropdown() { dropdown.style.display = 'none'; dropdown.setAttribute('aria-hidden', 'true'); selected = -1; highlightSelection(); }
+
+        function highlightSelection() {
+            const items = list.querySelectorAll('.search-item');
+            items.forEach((it, i) => it.setAttribute('aria-selected', String(i === selected)));
+            if (selected >= 0 && items[selected]) items[selected].scrollIntoView({ block: 'nearest' });
+        }
+
+        function renderResults(results, query) {
+            list.innerHTML = '';
+            selected = -1;
+            if (!results || results.length === 0) {
+                state.style.display = 'block';
+                state.textContent = query ? '未找到结果' : '在输入框中输入开始搜索（按 / 聚焦）';
+                list.style.display = 'none';
+                return;
+            }
+            state.style.display = 'none';
+            list.style.display = 'block';
+            const frag = document.createDocumentFragment();
+            results.slice(0, MAX_RESULTS).forEach((r, idx) => {
+                const item = r.item || r;
+                const titleHtml = esc(item.title);
+                const excerptText = item.excerpt || (item.content ? item.content.slice(0, 200) : '');
+                const excerptHtml = esc(excerptText);
+                const tagsHtml = (item.tags && item.tags.length) ? item.tags.slice(0, 3).map(t => `<span class="tag-pill">${esc(t)}</span>`).join(' ') : '';
+                const datePart = item.date ? `<span style="color:#888;font-size:0.85rem">${esc(new Date(item.date).toISOString().slice(0, 10))}</span>` : '';
+
+                const li = document.createElement('li');
+                li.className = 'search-item';
+                li.setAttribute('role', 'option');
+                li.setAttribute('data-index', String(idx));
+                li.innerHTML = `
+        <a href="${esc(item.slug)}" style="display:block;color:inherit;text-decoration:none">
+          <div class="title">${titleHtml}</div>
+          <div class="meta">${tagsHtml} ${datePart}</div>
+          <div class="excerpt">${excerptHtml}</div>
+        </a>
+      `;
+                // 点击后交由 a 标签导航，同时关闭面板
+                li.addEventListener('click', () => { closeDropdown(); });
+                frag.appendChild(li);
+            });
+            list.appendChild(frag);
+        }
+
+        function debounce(fn, wait = 160) {
+            let t = null;
+            return function (...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), wait); };
+        }
+
+        async function ensureIndex() {
+            if (loaded) return;
+            // cdn + fetch
+            if (!window.Fuse) {
+                await new Promise((res, rej) => {
+                    const s = document.createElement('script');
+                    s.src = 'https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js';
+                    s.onload = res; s.onerror = rej; document.head.appendChild(s);
+                });
+            }
+            const resp = await fetch('/search.json');
+            docs = await resp.json();
+            fuse = new Fuse(docs, {
+                keys: [{ name: 'title', weight: 0.7 }, { name: 'tags', weight: 0.25 }, { name: 'content', weight: 0.05 }],
+                includeMatches: true, includeScore: true, threshold: 0.35, ignoreLocation: true, minMatchCharLength: 2
+            });
+            loaded = true;
+        }
+
+        const doSearch = debounce(async function (q) {
+            if (!q) { renderResults([], q); return; }
+            try {
+                if (!loaded) { state.style.display = 'block'; state.textContent = '加载索引中...'; await ensureIndex(); state.style.display = 'none'; }
+                const out = fuse.search(q, { limit: 50 });
+                renderResults(out, q);
+            } catch (err) {
+                state.style.display = 'block';
+                state.textContent = '索引加载失败，请刷新重试';
+                console.error(err);
+            }
+        }, 160);
+
+        // 事件绑定
+        input.addEventListener('input', e => {
+            const v = (e.target.value || '').trim();
+            clearBtn.style.display = v ? 'inline-flex' : 'none';
+            openDropdown();
+            state.style.display = 'block';
+            state.textContent = '搜索中...';
+            list.style.display = 'none';
+            doSearch(v);
+        });
+
+
+        input.addEventListener('keydown', function (e) {
+            const items = list.querySelectorAll('.search-item');
+            if (dropdown.style.display === 'none') return;
+            if (e.key === 'ArrowDown') { e.preventDefault(); selected = Math.min(selected + 1, items.length - 1); highlightSelection(); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); selected = Math.max(selected - 1, 0); highlightSelection(); }
+            else if (e.key === 'Enter') {
+                if (selected >= 0 && items[selected]) {
+                    const a = items[selected].querySelector('a');
+                    if (a) window.location.href = a.getAttribute('href');
+                }
+            } else if (e.key === 'Escape') {
+                closeDropdown(); input.blur();
+            }
+        });
+
+        // clearBtn.addEventListener('click', () => { input.value = ''; clearBtn.style.display = 'none'; list.innerHTML = ''; state.style.display = 'block'; state.textContent = '在输入框中输入开始搜索（按 / 聚焦）'; input.focus(); });
+
+        window.addEventListener('keydown', function (e) {
+            if (e.key === '/' && document.activeElement !== input) {
+                const tag = document.activeElement && document.activeElement.tagName;
+                if (tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable)) return;
+                e.preventDefault(); input.focus(); input.select && input.select();
+            }
+        });
+
+        document.addEventListener('click', function (e) {
+            const t = e.target;
+            if (!document.getElementById('search-root').contains(t)) closeDropdown();
+        }, true);
+
+    })();
+</script>
+
+</main>
+  <footer class="site-footer">
+    <p>© step 7</p>
+  </footer>
+</body>
+
+</html>

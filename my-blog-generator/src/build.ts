@@ -12,7 +12,7 @@ const CONTENT_DIR = path.join(process.cwd(), "content", "posts");
 const OUTPUT_DIR = path.join(process.cwd(), "dist");
 const TEMPLATE_DIR = path.join(process.cwd(), "templates");
 
-// Markdown 渲染器（带数学与高亮）
+// Markdown 渲染器初始化
 const md: MarkdownIt = new MarkdownIt({
   html: true,
   linkify: true,
@@ -26,13 +26,7 @@ const md: MarkdownIt = new MarkdownIt({
     return `<pre class="hljs"><code>${md.utils.escapeHtml(str)}</code></pre>`;
   },
 })
-  .use(mathjax3)
-  .use(mila, {
-    attrs: {
-      target: "_blank",
-      rel: "noopener",
-    },
-  });
+  .use(mathjax3);
 
 // 配置 nunjucks（使用同一个 env，这样 addFilter 生效）
 const env = nunjucks.configure(TEMPLATE_DIR, { autoescape: false });
@@ -77,7 +71,8 @@ interface Post {
 // 如果 Markdown 没有 front-matter，则自动补上并写回文件
 function ensureFrontMatter(filePath: string) {
   const raw = fs.readFileSync(filePath, "utf-8");
-  const parsed = matter(raw);
+  const parsed = matter(raw); // 解析 front-matter
+  //若没有则自动补上
   if (!parsed.data || Object.keys(parsed.data).length === 0) {
     const slug = path.basename(filePath).replace(/\.md$/, "");
     const fm = {
@@ -110,12 +105,12 @@ function loadPosts(): Post[] {
 
   const posts: Post[] = files.map(file => {
     const filePath = path.join(CONTENT_DIR, file);
-    const parsed = ensureFrontMatter(filePath);
+    const parsed = ensureFrontMatter(filePath);  
     const data = parsed.data || {};
     const rawContent = parsed.content || "";
     const rendered = md.render(rawContent);
 
-    const slug = file.replace(/\.md$/, "");
+    const slug = file.replace(/\.md$/, "");  //slug化，把任意标签字符串转换为 URL/文件系统安全的短字符串，防止文件/目录名包含空格或特殊字符导致的路径错误
 
     const excerpt = makeExcerptFromHtml(rendered, 220);
 
@@ -150,6 +145,7 @@ function buildList(posts: Post[], perPage = 5) {
   const totalPages = Math.ceil(posts.length / perPage);
   const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
 
+  //分页
   for (let page = 1; page <= totalPages; page++) {
     const start = (page - 1) * perPage;
     const end = start + perPage;
@@ -188,7 +184,7 @@ function buildTags(posts: Post[]) {
     const dir = path.join(tagDir, tag);
     fs.mkdirSync(dir, { recursive: true });
 
-    const html = env.render("list-template.html", {
+    const html = env.render("tag-template.html", {
       tag,
       posts: tagPosts,
     });
@@ -214,18 +210,56 @@ function buildSitemap(posts: Post[]) {
   fs.writeFileSync(path.join(OUTPUT_DIR, "sitemap.xml"), xml, "utf-8");
 }
 
+// 复制 static files
 function copyStyle() {
   const src = path.join(process.cwd(), "static", "style.css");
   const dest = path.join(OUTPUT_DIR, "style.css");
 
   if (fs.existsSync(src)) {
     fs.copyFileSync(src, dest);
-    console.log("✅ style.css copied to dist/");
   } else {
-    console.warn("⚠️ style.css not found in project root.");
+    console.warn("style.css not found in project root.");
   }
 }
 
+//front-end search  生成serch.json
+function buildSearch(posts: Post[]) {
+  const docs = posts.map((p, idx) => {
+    //把 HTML 里的文本抽取为纯文本，并截断
+    // 生成供前端搜索的纯文本（去 html 标签，合并空白）
+    const plain = stripTags(p.content).replace(/\s+/g, " ").trim();
+    // 可选：截断 content 长度以控制 search.json 大小（10000 字符）
+    const content = plain.length > 10000 ? plain.slice(0, 4000) : plain;
+
+    return {
+      id: idx + 1,
+      title: p.title,
+      tags: p.tags || [],
+      content,
+      excerpt: p.excerpt,
+      slug: `/posts/${p.slug}.html`, // 方便直接跳转
+      date: p.date,
+    };
+  });
+
+  const out = path.join(OUTPUT_DIR, "search.json");
+  //写到search.json
+  try {
+    fs.writeFileSync(out, JSON.stringify(docs, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Failed to write search.json:", err);
+  }
+}
+
+// 生成静态的搜索页面（dist/search.html）
+function buildSearchPage() {
+  try {
+    const html = env.render("search.html", { title: "Search" });
+    fs.writeFileSync(path.join(OUTPUT_DIR, "search.html"), html, "utf-8");
+  } catch (err) {
+    console.error("Failed to render search page:", err);
+  }
+}
 // 执行构建
 const posts = loadPosts();
 buildPosts(posts);
@@ -233,5 +267,7 @@ buildList(posts);
 buildTags(posts);
 buildSitemap(posts);
 copyStyle();
+buildSearch(posts);
+buildSearchPage();
 
 console.log(`Built ${posts.length} posts → ${OUTPUT_DIR}`);

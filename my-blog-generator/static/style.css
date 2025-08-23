@@ -1,4 +1,4 @@
-:root{
+:root {
   --bg: #f6f8fb;
   --card-bg: #ffffff;
   --text: #0f1724;
@@ -13,21 +13,28 @@
 }
 
 /* Reset / base */
-* { box-sizing: border-box; }
-html,body { height: 100%; }
-body{
-  margin:0;
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  color:var(--text);
+  color: var(--text);
   background: var(--bg);
-  -webkit-font-smoothing:antialiased;
-  -moz-osx-font-smoothing:grayscale;
-  line-height:1.5;
-  font-size:16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+  font-size: 16px;
 }
 
 /* 固定 header（顶部） 和 footer（底部） */
-.site-header{
+.site-header {
   position: fixed;
   top: 0;
   left: 0;
@@ -36,21 +43,26 @@ body{
   display: flex;
   align-items: center;
   padding: 0 1rem;
-  background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.90));
-  border-bottom: 1px solid rgba(15,23,36,0.06);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.90));
+  border-bottom: 1px solid rgba(15, 23, 36, 0.06);
   z-index: 50;
   backdrop-filter: blur(6px);
-  box-shadow: 0 6px 20px rgba(12,18,30,0.03);
+  box-shadow: 0 6px 20px rgba(12, 18, 30, 0.03);
 }
-.site-header h1{
-  margin:0;
-  font-size:1.125rem;
-  font-weight:600;
+
+.site-header h1 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
 }
-.site-header a{ color:var(--text); text-decoration:none; }
+
+.site-header a {
+  color: var(--text);
+  text-decoration: none;
+}
 
 /* 主区域：用 padding 给出 header/footer 的占位，页面不产生全局滚动 */
-.site-main{
+.site-main {
   /* main 不是 fixed，而是使用 padding 来避免被 header/footer 遮挡 */
   padding-top: calc(var(--header-height) + var(--container-padding));
   padding-bottom: calc(var(--footer-height) + var(--container-padding));
@@ -61,77 +73,95 @@ body{
 }
 
 /* 页面内容容器 */
-.container{
+.container {
   width: 100%;
   max-width: var(--max-width);
   padding: 0 var(--container-padding);
 }
 
 /* 列表区：高度刚好填满 header/footer 中间区域；内部可滚动（页面级不滚动） */
-.post-list{
+.post-list {
   display: flex;
   flex-direction: column;
   gap: 1rem;
   /* calc: 视口高度 - header - footer - 上下 container padding */
   height: calc(95vh - var(--header-height) - var(--footer-height) - (var(--container-padding) * 2));
   overflow-y: auto;
-  padding-right: 0.5rem; /* 给滚动条留出点空间 */
+  padding-right: 0.5rem;
+  /* 给滚动条留出点空间 */
   scroll-behavior: smooth;
 }
 
 /* 每篇文章卡片 */
-.post-item{
+.post-item {
   background: var(--card-bg);
   padding: 0.5rem;
   border-radius: calc(var(--radius) - 2px);
-  box-shadow: 0 8px 24px rgba(12,18,30,0.04);
-  border: 1px solid rgba(12,18,30,0.04);
+  box-shadow: 0 8px 24px rgba(12, 18, 30, 0.04);
+  border: 1px solid rgba(12, 18, 30, 0.04);
   transition: transform .15s ease, box-shadow .15s ease;
 }
-.post-item:hover{
+
+.post-item:hover {
   transform: translateY(-4px);
-  box-shadow: 0 18px 36px rgba(12,18,30,0.06);
+  box-shadow: 0 18px 36px rgba(12, 18, 30, 0.06);
 }
-.post-item h2{
+
+.post-item h2 {
   margin: 0 0 6px 0;
   font-size: 1.05rem;
   line-height: 1.25;
 }
-.post-item a{ color: var(--accent); text-decoration: none; }
-.post-item a:hover { text-decoration: underline; }
+
+.post-item a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.post-item a:hover {
+  text-decoration: underline;
+}
 
 /* meta 信息与标签 */
-.post-meta{
+.post-meta {
   color: var(--muted);
   font-size: 0.9rem;
   margin-bottom: 0.6rem;
   display: flex;
   gap: 8px;
   align-items: center;
-  flex-wrap:wrap;
+  flex-wrap: wrap;
 }
-.post-meta span { white-space: nowrap; }
+
+.post-meta span {
+  white-space: nowrap;
+}
 
 /* 标签样式 */
-.tag-list, .meta .tags {
-  display:inline-flex;
+.tag-list,
+.meta .tags {
+  display: inline-flex;
   gap: 6px;
-  align-items:center;
+  align-items: center;
 }
-.tag{
-  display:inline-block;
-  background: rgba(37,99,235,0.08);
+
+.tag {
+  display: inline-block;
+  background: rgba(37, 99, 235, 0.08);
   color: var(--accent);
   font-size: 0.85rem;
   padding: 4px 8px;
   border-radius: 999px;
-  text-decoration:none;
-  border: 1px solid rgba(37,99,235,0.08);
+  text-decoration: none;
+  border: 1px solid rgba(37, 99, 235, 0.08);
 }
-.tag:hover { background: rgba(37,99,235,0.12); }
+
+.tag:hover {
+  background: rgba(37, 99, 235, 0.12);
+}
 
 /* 摘要：限制行数，保证每项高度可控（避免页面整体超长） */
-.post-excerpt{
+.post-excerpt {
   color: #374151;
   margin-top: 8px;
   font-size: 0.96rem;
@@ -143,41 +173,46 @@ body{
 }
 
 /* 分页样式 */
-.pagination{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  justify-content:center;
+.pagination {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
   margin-top: 14px;
   margin-bottom: 6px;
-  flex-wrap:wrap;
+  flex-wrap: wrap;
 }
-.pagination a, .pagination .current {
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  min-width:36px;
+
+.pagination a,
+.pagination .current {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
   padding: 6px 10px;
-  border-radius:8px;
-  text-decoration:none;
-  font-weight:500;
-  border: 1px solid rgba(15,23,36,0.06);
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 500;
+  border: 1px solid rgba(15, 23, 36, 0.06);
 }
-.pagination a{
+
+.pagination a {
   background: transparent;
   color: var(--text);
 }
-.pagination a:hover{
-  background: rgba(15,23,36,0.03);
+
+.pagination a:hover {
+  background: rgba(15, 23, 36, 0.03);
 }
-.pagination .current{
+
+.pagination .current {
   background: var(--accent);
   color: white;
-  border-color: rgba(0,0,0,0.04);
+  border-color: rgba(0, 0, 0, 0.04);
 }
 
 /* Footer 固定底部 */
-.site-footer{
+.site-footer {
   position: fixed;
   left: 0;
   right: 0;
@@ -186,61 +221,101 @@ body{
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(0deg, rgba(255,255,255,0.98), rgba(255,255,255,0.98));
-  border-top: 1px solid rgba(15,23,36,0.06);
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.98));
+  border-top: 1px solid rgba(15, 23, 36, 0.06);
   z-index: 60;
-  box-shadow: 0 -8px 24px rgba(12,18,30,0.03);
+  box-shadow: 0 -8px 24px rgba(12, 18, 30, 0.03);
 }
-.site-footer p{ margin:0; color:var(--muted); font-size:0.95rem; }
+
+.site-footer p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
 
 /* 文章详情页面样式 */
-.post{
+.post {
   margin: 0 auto;
   max-width: 960px;
   background: transparent;
 }
-.post h2{ font-size:1.6rem; margin-bottom:6px; }
-.post .meta{ color: var(--muted); font-size:0.95rem; margin-bottom: 14px; display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
-.post .post-content{
+
+.post h2 {
+  font-size: 1.6rem;
+  margin-bottom: 6px;
+}
+
+.post .meta {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin-bottom: 14px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.post .post-content {
   background: var(--card-bg);
   padding: 20px;
   border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(12,18,30,0.04);
-  border: 1px solid rgba(12,18,30,0.03);
-  line-height:1.75;
-  color:#111827;
+  box-shadow: 0 10px 30px rgba(12, 18, 30, 0.04);
+  border: 1px solid rgba(12, 18, 30, 0.03);
+  line-height: 1.75;
+  color: #111827;
 }
 
 /* 代码块样式（配合 highlight.js）*/
-pre.hljs{
+pre.hljs {
   overflow: auto;
   padding: 16px;
   border-radius: 10px;
   font-size: 0.95rem;
-  box-shadow: inset 0 -2px 0 rgba(0,0,0,0.02);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.02);
   margin: 16px 0;
 }
 
 /* 图片自适应 */
-.post-content img{ max-width:100%; height:auto; border-radius:8px; }
+.post-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
 
-/* MathJax 居中处理（常见类） */
-.mjx-chtml, .MathJax_SVG_Display { display: block !important; margin: 1rem auto !important; max-width: 100%; }
+/* MathJax （数学公式）居中处理（常见类） */
+.mjx-chtml,
+.MathJax_SVG_Display {
+  display: block !important;
+  margin: 1rem auto !important;
+  max-width: 100%;
+}
 
-/* 小屏幕优化 */
-@media (max-width: 720px){
-  :root{
+/* 小屏幕适配 */
+@media (max-width: 720px) {
+  :root {
     --header-height: 56px;
     --footer-height: 56px;
     --container-padding: 14px;
   }
-  .post-item h2{ font-size: 1rem; }
-  .post .post-content{ padding: 14px; }
+
+  .post-item h2 {
+    font-size: 1rem;
+  }
+
+  .post .post-content {
+    padding: 14px;
+  }
 }
 
 
-/* 为辅助键盘可访问性：当内部滚动时，允许 focus 后滚动 */
-.post-list:focus { outline: none; }
+/* 当内部滚动时，允许 focus 后滚动 */
+.post-list:focus {
+  outline: none;
+}
 
-/* 小微交互：链接 hover、按钮 */
-a { transition: color .12s ease; }
+/* 链接 hover、按钮 */
+a {
+  transition: color .12s ease;
+}
+
+/*搜索框*/
